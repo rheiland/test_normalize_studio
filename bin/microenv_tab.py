@@ -25,6 +25,8 @@ class SubstrateDef(QWidget):
         super().__init__()
         # global self.microenv_params
 
+        self.ignore_dirichlet_toggle = False
+
         self.param_d = {}  # a dict of dicts - rwh/todo, used anymore?
         # self.substrate = {}
         self.current_substrate = None
@@ -439,21 +441,25 @@ class SubstrateDef(QWidget):
             self.dirichlet_zmin.setText(text)
             self.dirichlet_zmax.setText(text)
 
+    # def dummy_dirichlet_toggle_cb(self):
+    #     return
+
     def dirichlet_toggle_cb(self):
-        # print("dirichlet_toggle_cb()")
+        # print("---------- WARNING: dirichlet_toggle_cb()")
         self.param_d[self.current_substrate]["dirichlet_enabled"] = self.dirichlet_bc_enabled.isChecked()
         if self.dirichlet_bc_enabled.isChecked():
             options_flag = True
         else:
             options_flag = False
-        self.enable_xmin.setChecked(options_flag)
-        self.enable_xmax.setChecked(options_flag)
-        self.enable_ymin.setChecked(options_flag)
-        self.enable_ymax.setChecked(options_flag)
-        self.enable_zmin.setChecked(options_flag)
-        self.enable_zmax.setChecked(options_flag)
+        if not self.ignore_dirichlet_toggle:
+            self.enable_xmin.setChecked(options_flag)
+            self.enable_xmax.setChecked(options_flag)
+            self.enable_ymin.setChecked(options_flag)
+            self.enable_ymax.setChecked(options_flag)
+            self.enable_zmin.setChecked(options_flag)
+            self.enable_zmax.setChecked(options_flag)
 
-        if options_flag:
+        if options_flag and not self.ignore_dirichlet_toggle:
             sval = self.dirichlet_bc.text() 
             self.dirichlet_xmin.setText(sval)
             self.dirichlet_xmax.setText(sval)
@@ -499,7 +505,7 @@ class SubstrateDef(QWidget):
     #----------------------------------------------------------------------
     # @QtCore.Slot()
     def new_substrate(self):
-        # print('------ new_substrate')
+        print('------ new_substrate():   disable all Dirichlet BCs')
         subname = "substrate%02d" % self.new_substrate_count
         # Make a new substrate (that's a copy of the currently selected one)
         # self.param_d[subname] = self.param_d[self.current_substrate].copy()  #rwh - "copy()" is critical
@@ -696,7 +702,7 @@ class SubstrateDef(QWidget):
     #----------------------------------------------------------------------
     # Update the widget values with values from param_d
     def tree_item_clicked_cb(self, it,col):
-        # print('--------- tree_item_clicked_cb():', it, col, it.text(col) )  # col=0 always
+        print('--------- tree_item_clicked_cb():', it, col, it.text(col) )  # col=0 always
         self.current_substrate = it.text(col)
         # print('self.current_substrate= ',self.current_substrate )
         # print('self.= ',self.tree.indexFromItem )
@@ -717,7 +723,8 @@ class SubstrateDef(QWidget):
         # print("    xmin=",xmin)
         if self.dirichlet_options_exist:
             val = self.param_d[self.current_substrate]["dirichlet_xmin"]
-            # print('--------- tree_item_clicked_cb(): dirichlet_xmin=', val)
+            print('--------- tree_item_clicked_cb(): dirichlet_xmin=', val)
+            print("     param_d= ",self.param_d[self.current_substrate])
             self.dirichlet_xmin.setText(val)
             self.dirichlet_xmax.setText(self.param_d[self.current_substrate]["dirichlet_xmax"])
             self.dirichlet_ymin.setText(self.param_d[self.current_substrate]["dirichlet_ymin"])
@@ -760,7 +767,7 @@ class SubstrateDef(QWidget):
 # -->
 #  		</variable>
     def populate_tree(self):
-        print("=======================  microenv populate_tree  ======================= ")
+        print("\n\n\n=======================  microenv populate_tree  ======================= ")
         uep = self.xml_root.find(".//microenvironment_setup")
         if uep:
             # self.substrate.clear()
@@ -856,7 +863,7 @@ class SubstrateDef(QWidget):
                     if options_path:
                         # self.dirichlet_options_exist = True
                         for bv in options_path:
-                            print("bv = ",bv)
+                            print("bv = ",bv.tag,bv.attrib)
                             if "xmin" in bv.attrib['ID'].lower():
                                 self.param_d[substrate_name]["dirichlet_xmin"] = bv.text
                                 print("   -------- ",substrate_name, ":  dirichlet_xmin = ",bv.text)
@@ -883,9 +890,12 @@ class SubstrateDef(QWidget):
                                     self.param_d[substrate_name]["enable_ymin"] = True
                             elif "ymax" in bv.attrib['ID']:
                                 self.param_d[substrate_name]["dirichlet_ymax"] = bv.text
+                                print("--------\nmicroenv_tab: dirichlet_ymax= ",bv.text)
                                 self.dirichlet_ymax.setText(bv.text)
                                 if "true" in bv.attrib['enabled'].lower():
                                     self.param_d[substrate_name]["enable_ymax"] = True
+                                    # print("--------\nmicroenv_tab: ymax enabled= True")
+                                    print(self.param_d[substrate_name])
                             elif "zmin" in bv.attrib['ID']:
                                 self.param_d[substrate_name]["dirichlet_zmin"] = bv.text
                                 # self.dirichlet_zmin.setText(bv.text)
@@ -896,6 +906,7 @@ class SubstrateDef(QWidget):
                                 # self.dirichlet_zmax.setText(bv.text)
                                 if "true" in bv.attrib['enabled'].lower():
                                     self.param_d[substrate_name]["enable_zmax"] = True
+                        # sys.exit()
                     else:
                         # self.dirichlet_options_exist = False
                         self.param_d[substrate_name]["enable_xmin"] = False
@@ -947,11 +958,15 @@ class SubstrateDef(QWidget):
             #     print(" found: track_path  = true")
             #     self.param_d[self.current_substrate]["track_in_agents"] = True
 
+        # self.dirichlet_bc_enabled.stateChanged.connect(self.dummy_dirichlet_toggle_cb)
+        self.ignore_dirichlet_toggle = True
         self.current_substrate = substrate_0th
         self.tree.setCurrentItem(self.tree.topLevelItem(0))  # select the top (0th) item
         self.tree_item_clicked_cb(self.tree.topLevelItem(0), 0)  # and invoke its callback to fill widget values
+        # self.dirichlet_bc_enabled.stateChanged.connect(self.dirichlet_toggle_cb)
+        self.ignore_dirichlet_toggle = False
 
-        print("\n\n=======================  leaving microenv populate_tree  ======================= ")
+        print("\n\n=======================  leaving microenv populate_tree  =======================\n\n\n ")
         # for k in self.param_d.keys():
         #     print(" ===>>> ",k, " : ", self.param_d[k])
 
